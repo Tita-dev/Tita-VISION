@@ -1,56 +1,49 @@
-from typing_extensions import Concatenate
 import torch
 import os
-import pandas as pd
 import numpy as np
-from torch.utils import *
+from torch.utils.data import DataLoader, Dataset
 import torch.nn as nn
-import matplotlib.pyplot as plt
+from PIL import Image
 
-class MyImageDataset(torch.utils.data.dataset):
-    def __init__(self, img_dir, transform=None):
-        self.img_dir = img_dir
+'''
+dataset에서 모든 data 불러오기 -> main.py에서 train test split -> 
+dataloader -> train
+'''
+
+class TitaDataset(Dataset):
+    def __init__(self, transform = None):
+        super().__init__()
+
+        self.img_dir = "D:\Desktop\project\Tita\data"
+        self.filenames = os.listdir(self.img_dir)
+
         self.transform = transform
-        self.to_tensor = ToTensor()
-        data_list = os.listdir(self.img_dir)
-        data_list = [file for file in data_list if file.endswith(".jpg")]
-        self.data_list = data_list
-        
-
-    def __len__(self):
-        return len(self.data_list)
-
-
-    def __add__(self, other):
-        return Concatenate(self, other)
 
     def __getitem__(self, index):
-        img = plt.imread(os.path.join(self.img_dir, self.data_list[index]))
+        label = MakeLabel(self.filenames, index)
+        img_path = os.path.join(self.img_dir, self.filenames[index])
+        img = np.asarray_chkfinite(Image.open(img_path))
 
-        ox = os.path.basename(os.path.join(self.img_dir)) # 인덱스에 맞는 파일명 가져오기
-        if "O" in ox:
-            label = "0"
-        else : label = "1"
-
-        if img.ndim == 2:
-            img = img[:, :, np.newaxis]
-        
         if img.dtype == np.uint8:
             img = img / 255.0
         
-        data = tuple(img, label)
+        input = (img, label)
+
+        if self.transform:
+            input = self.transform(input)
         
-        data = self.to_tensor(data)
-        
-        return data
-
-
-class ToTensor(object):
-    def __call__(self, data):
-        for key, value in data.items():
-            value = value.astype(np.float32)
-            data[key] = torch.from_numpy(value)
-
-        return data
+        return input
         
 
+    def __len__(self):
+        return len(self.filenames)
+
+    
+
+def MakeLabel(filenames, index):
+        input_img = filenames[index]
+        if "O" in input_img:
+            label = 1
+        else : label = 0
+
+        return label
